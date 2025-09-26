@@ -30,55 +30,30 @@ class ComprehensiveSolanaCollector:
         
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             try:
-                # Get all pools from DeFiLlama
                 response = await client.get(self.base_url)
                 response.raise_for_status()
                 data = response.json()
                 all_pools = data.get('data', [])
-            except httpx.RequestError as e:
-                logging.error(f"Failed to fetch data from DeFiLlama: {e}")
-                return []
-            except httpx.HTTPStatusError as e:
-                logging.error(f"HTTP error from DeFiLlama: {e}")
+            except Exception as e:
+                logging.error(f"Failed to fetch data: {e}")
                 return []
         
-        # Filter for Solana
-        solana_pools = self._filter_solana_pools(all_pools)
+        # Filter for Solana chain only
+        solana_pools = [pool for pool in all_pools if pool.get('chain') == 'Solana']
         
-        # Convert to YieldOpportunity objects
+        print(f"Found {len(solana_pools)} Solana pools from {len(all_pools)} total pools")
+        
+        # Convert to opportunities
         opportunities = []
         for pool in solana_pools:
             opp = self._create_opportunity(pool)
-            if opp and self._validate_opportunity(opp):
+            if opp:
                 opportunities.append(opp)
         
-        # Remove duplicates and sort
-        opportunities = self._deduplicate(opportunities)
+        # Sort by APY and return
         opportunities.sort(key=lambda x: x.apy, reverse=True)
-        
-        print(f"✅ Collected {len(opportunities)} Solana yield opportunities")
+        print(f"✅ Returning {len(opportunities)} Solana yield opportunities")
         return opportunities
-    
-    def _filter_solana_pools(self, pools: List[Dict]) -> List[Dict]:
-        """Filter pools for Solana ecosystem"""
-        
-        solana_protocols = {
-            'raydium', 'orca', 'solend', 'mango', 'port', 'tulip', 'marinade', 
-            'lido', 'saber', 'sunny', 'drift', 'zeta', 'friktion', 'quarry',
-            'aldrin', 'cropper', 'meteora', 'lifinity', 'apricot', 'jet',
-            'francium', 'larix', 'marginfi', 'kamino', 'socean', 'jpool'
-        }
-        
-        solana_pools = []
-        for pool in pools:
-            chain = pool.get('chain', '').lower()
-            project = pool.get('project', '').lower()
-            
-            if (chain == 'solana' or 
-                any(protocol in project for protocol in solana_protocols)):
-                solana_pools.append(pool)
-        
-        return solana_pools
     
     def _create_opportunity(self, pool: Dict) -> Optional[YieldOpportunity]:
         """Convert pool data to YieldOpportunity"""
@@ -86,28 +61,23 @@ class ComprehensiveSolanaCollector:
         apy = pool.get('apy', 0)
         tvl = pool.get('tvlUsd', 0)
         
-        # Convert percentage to decimal if needed
-        if apy > 5:
-            apy = apy / 100
-            
-        if apy <= 0 or tvl <= 0:
+        # Basic validation
+        if not apy or not tvl or apy <= 0 or tvl < 1000:
             return None
         
-        protocol = pool.get('project', 'Unknown')
-        category = self._categorize_protocol(protocol, pool.get('symbol', ''))
+        # Convert percentage APY to decimal if needed
+        if apy > 5:
+            apy = apy / 100
         
         return YieldOpportunity(
-            protocol=protocol,
+            protocol=pool.get('project', 'Unknown'),
             pool_id=pool.get('pool', ''),
             pair=pool.get('symbol', ''),
             apy=apy,
             tvl=tvl,
-            category=category,
+            category=self._get_category(pool.get('project', '')),
             tokens=pool.get('underlyingTokens', []),
-            risks={
-                'il_risk': pool.get('ilRisk', 'no'),
-                'audit_score': self._get_audit_score(protocol)
-            },
+            risks={'audit_score': self._get_audit_score(pool.get('project', ''))},
             metadata={
                 'url': pool.get('url', ''),
                 'reward_tokens': pool.get('rewardTokens', [])
@@ -115,60 +85,32 @@ class ComprehensiveSolanaCollector:
             last_updated=datetime.now()
         )
     
-    def _categorize_protocol(self, protocol: str, symbol: str) -> str:
-        """Categorize protocol type"""
+    def _get_category(self, project: str) -> str:
+        """Simple categorization"""
+        project = project.lower()
         
-        protocol_lower = protocol.lower()
-        
-        if any(p in protocol_lower for p in ['raydium', 'orca', 'serum', 'aldrin']):
+        if any(x in project for x in ['raydium', 'orca', 'serum']):
             return 'dex'
-        elif any(p in protocol_lower for p in ['solend', 'mango', 'port', 'tulip']):
+        elif any(x in project for x in ['solend', 'mango', 'port']):
             return 'lending'
-        elif any(p in protocol_lower for p in ['marinade', 'lido', 'socean']):
+        elif any(x in project for x in ['marinade', 'lido']):
             return 'liquid_staking'
-        elif any(p in protocol_lower for p in ['drift', 'zeta', 'friktion']):
+        elif any(x in project for x in ['drift', 'zeta']):
             return 'derivatives'
-        elif any(p in protocol_lower for p in ['saber', 'sunny', 'quarry']):
-            return 'farm'
         else:
             return 'other'
     
-    def _get_audit_score(self, protocol: str) -> float:
-        """Estimate audit score"""
-        high_audit = {'orca', 'raydium', 'solend', 'marinade'}
-        medium_audit = {'mango', 'port', 'drift', 'saber'}
+    def _get_audit_score(self, project: str) -> float:
+        """Simple audit scoring"""
+        project = project.lower()
         
-        protocol_lower = protocol.lower()
-        
-        if any(p in protocol_lower for p in high_audit):
+        if any(x in project for x in ['orca', 'raydium', 'solend', 'marinade']):
             return 0.9
-        elif any(p in protocol_lower for p in medium_audit):
+        elif any(x in project for x in ['mango', 'port', 'drift']):
             return 0.7
         else:
             return 0.5
-    
-    def _validate_opportunity(self, opp: YieldOpportunity) -> bool:
-        """Validate opportunity"""
-        if opp.apy < 0.005 or opp.apy > 10:  # 0.5% to 1000%
-            return False
-        if opp.tvl < 1000:  # Minimum $1000 TVL
-            return False
-        return True
-    
-    def _deduplicate(self, opportunities: List[YieldOpportunity]) -> List[YieldOpportunity]:
-        """Remove duplicates"""
-        seen = set()
-        unique = []
-        
-        for opp in opportunities:
-            key = f"{opp.protocol}_{opp.pair}"
-            if key not in seen:
-                seen.add(key)
-                unique.append(opp)
-        
-        return unique
 
-# Simple interface
 async def get_all_solana_yields() -> List[YieldOpportunity]:
     collector = ComprehensiveSolanaCollector()
     return await collector.get_all_solana_yields()
