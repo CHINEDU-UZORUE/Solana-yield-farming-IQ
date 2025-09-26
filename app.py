@@ -7,7 +7,7 @@ import asyncio
 from datetime import datetime, timedelta
 import logging
 
-# Import existing modules
+# Import your existing modules
 from src.collector import get_all_solana_yields, YieldOpportunity
 from src.processor import YieldDataProcessor
 from src.models import RiskScorer, PortfolioOptimizer
@@ -102,7 +102,7 @@ async def root():
     """Health check endpoint"""
     return {"message": "Solana Yield Farming API is running!", "status": "healthy"}
 
-@app.get("/api/yields", response_model=List[YieldResponse])
+@app.get("/api/yields")
 async def get_yields(
     min_apy: float = Query(0.0, ge=0.0, description="Minimum APY (as decimal, e.g., 0.05 for 5%)"),
     min_tvl: int = Query(0, ge=0, description="Minimum TVL in USD"),
@@ -165,7 +165,7 @@ async def get_yields(
         logger.error(f"Error in get_yields: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/analytics", response_model=AnalyticsResponse)
+@app.get("/api/analytics")
 async def get_analytics():
     """Get market analytics summary"""
     try:
