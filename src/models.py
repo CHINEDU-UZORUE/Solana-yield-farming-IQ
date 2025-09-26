@@ -1,4 +1,3 @@
-# models.py
 from typing import Dict, List
 
 class RiskScorer:
