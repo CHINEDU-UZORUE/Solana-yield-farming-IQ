@@ -55,7 +55,7 @@ class ComprehensiveSolanaCollector:
         opportunities = self._deduplicate(opportunities)
         opportunities.sort(key=lambda x: x.apy, reverse=True)
         
-        print(f"âœ… Collected {len(opportunities)} Solana yield opportunities")
+        print(f"✓ Collected {len(opportunities)} Solana yield opportunities")
         return opportunities
     
     def _filter_solana_pools(self, pools: List[Dict]) -> List[Dict]:
@@ -65,7 +65,7 @@ class ComprehensiveSolanaCollector:
             'raydium', 'orca', 'solend', 'mango', 'port', 'tulip', 'marinade', 
             'lido', 'saber', 'sunny', 'drift', 'zeta', 'friktion', 'quarry',
             'aldrin', 'cropper', 'meteora', 'lifinity', 'apricot', 'jet',
-            'francium', 'larix', 'marginfi', 'kamino', 'socean', 'jpool'
+            'francium', 'larix', 'marginfi', 'kamino', 'socean', 'jpool', 'jito'
         }
         
         solana_pools = []
@@ -117,7 +117,7 @@ class ComprehensiveSolanaCollector:
             return 'dex'
         elif any(p in protocol_lower for p in ['solend', 'mango', 'port', 'tulip']):
             return 'lending'
-        elif any(p in protocol_lower for p in ['marinade', 'lido', 'socean']):
+        elif any(p in protocol_lower for p in ['marinade', 'lido', 'socean', 'jito']):
             return 'liquid_staking'
         elif any(p in protocol_lower for p in ['drift', 'zeta', 'friktion']):
             return 'derivatives'
@@ -128,7 +128,7 @@ class ComprehensiveSolanaCollector:
     
     def _get_audit_score(self, protocol: str) -> float:
         """Estimate audit score"""
-        high_audit = {'orca', 'raydium', 'solend', 'marinade'}
+        high_audit = {'orca', 'raydium', 'solend', 'marinade', 'jito'}
         medium_audit = {'mango', 'port', 'drift', 'saber'}
         
         protocol_lower = protocol.lower()
@@ -142,7 +142,7 @@ class ComprehensiveSolanaCollector:
     
     def _validate_opportunity(self, opp: YieldOpportunity) -> bool:
         """Validate opportunity"""
-        if opp.apy < 0.05 or opp.apy > 1000:  # 0.5% to 1000%
+        if opp.apy < 0.05 or opp.apy > 1000:  # 0.05% to 1000%
             return False
         if opp.tvl < 1000:  # Minimum $1000 TVL
             return False
