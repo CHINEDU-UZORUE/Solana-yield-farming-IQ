@@ -85,13 +85,7 @@ class ComprehensiveSolanaCollector:
         apy = pool.get('apy', 0)
         tvl = pool.get('tvlUsd', 0)
         
-        # Convert percentage to decimal if needed
-        if apy > 5:
-            apy = apy / 100
-            
-        if apy <= 0 or tvl <= 0:
-            return None
-        
+       
         protocol = pool.get('project', 'Unknown')
         category = self._categorize_protocol(protocol, pool.get('symbol', ''))
         

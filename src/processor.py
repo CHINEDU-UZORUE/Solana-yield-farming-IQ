@@ -18,7 +18,7 @@ class YieldDataProcessor:
                 'category': opp.category,
                 'audit_score': opp.risks.get('audit_score', 0.5),
                 'pool_id': opp.pool_id,
-                'apy_percent': opp.apy * 100,
+                'apy_percent': opp.apy,
                 'risk_adjusted_apy': opp.apy * opp.risks.get('audit_score', 0.5)
             })
         
