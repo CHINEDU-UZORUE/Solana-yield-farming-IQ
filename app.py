@@ -52,10 +52,6 @@ app = FastAPI(
 import os
 
 # CORS configuration using environment variables
-ALLOWED_ORIGINS = os.getenv(
-    "ALLOWED_ORIGINS", 
-    "http://localhost:3000,http://localhost:5173,https://solana-yield-farming.vercel.app"
-).split(",")
 
 app.add_middleware(
     CORSMiddleware,

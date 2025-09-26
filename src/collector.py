@@ -38,10 +38,7 @@ class ComprehensiveSolanaCollector:
                 logging.error(f"Failed to fetch data: {e}")
                 return []
         
-        # Debug: Print all unique chain values (lowercase)
-        unique_chains = set(pool.get('chain', '').lower() for pool in all_pools if pool.get('chain'))
-        print(f"All available chains: {sorted(unique_chains)}")
-        
+          
         # Filter for Solana chain (convert to lowercase for comparison)
         solana_pools = [pool for pool in all_pools if pool.get('chain', '').lower() == 'solana']
         
@@ -65,19 +62,17 @@ class ComprehensiveSolanaCollector:
         apy = pool.get('apy', 0)
         tvl = pool.get('tvlUsd', 0)
         
-        # Basic validation
-        if not apy or not tvl or apy <= 0 or tvl < 1000:
+        # Basic validation - be more permissive
+        if not apy or not tvl or apy <= 0 or tvl < 100:  # Lowered TVL threshold
             return None
         
-        # Convert percentage APY to decimal if needed
-        if apy > 5:
-            apy = apy / 100
+
         
         return YieldOpportunity(
             protocol=pool.get('project', 'Unknown'),
             pool_id=pool.get('pool', ''),
             pair=pool.get('symbol', ''),
-            apy=apy,
+            apy=apy,  # Keep original APY value
             tvl=tvl,
             category=self._get_category(pool.get('project', '')),
             tokens=pool.get('underlyingTokens', []),
