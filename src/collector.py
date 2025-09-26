@@ -38,8 +38,12 @@ class ComprehensiveSolanaCollector:
                 logging.error(f"Failed to fetch data: {e}")
                 return []
         
-        # Filter for Solana chain only
-        solana_pools = [pool for pool in all_pools if pool.get('chain') == 'Solana']
+        # Debug: Print all unique chain values (lowercase)
+        unique_chains = set(pool.get('chain', '').lower() for pool in all_pools if pool.get('chain'))
+        print(f"All available chains: {sorted(unique_chains)}")
+        
+        # Filter for Solana chain (convert to lowercase for comparison)
+        solana_pools = [pool for pool in all_pools if pool.get('chain', '').lower() == 'solana']
         
         print(f"Found {len(solana_pools)} Solana pools from {len(all_pools)} total pools")
         
