@@ -1,5 +1,5 @@
 import asyncio
-import aiohttp
+import httpx
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 from datetime import datetime
@@ -23,19 +23,24 @@ class ComprehensiveSolanaCollector:
     
     def __init__(self):
         self.base_url = 'https://yields.llama.fi/pools'
-        self.timeout = aiohttp.ClientTimeout(total=30)
+        self.timeout = 30.0
         
     async def get_all_solana_yields(self) -> List[YieldOpportunity]:
         """Get ALL Solana yield opportunities"""
         
-        async with aiohttp.ClientSession(timeout=self.timeout) as session:
-            # Get all pools from DeFiLlama
-            async with session.get(self.base_url) as response:
-                if response.status != 200:
-                    return []
-                
-                data = await response.json()
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            try:
+                # Get all pools from DeFiLlama
+                response = await client.get(self.base_url)
+                response.raise_for_status()
+                data = response.json()
                 all_pools = data.get('data', [])
+            except httpx.RequestError as e:
+                logging.error(f"Failed to fetch data from DeFiLlama: {e}")
+                return []
+            except httpx.HTTPStatusError as e:
+                logging.error(f"HTTP error from DeFiLlama: {e}")
+                return []
         
         # Filter for Solana
         solana_pools = self._filter_solana_pools(all_pools)
