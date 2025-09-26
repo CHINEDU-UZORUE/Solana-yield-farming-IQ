@@ -1,12 +1,12 @@
-import pandas as pd
 from typing import List, Dict
+from collections import Counter, defaultdict
 from .collector import YieldOpportunity
 
 class YieldDataProcessor:
-    """Process yield data for analysis"""
+    """Process yield data for analysis without pandas dependency"""
     
-    def to_dataframe(self, opportunities: List[YieldOpportunity]) -> pd.DataFrame:
-        """Convert opportunities to DataFrame"""
+    def to_dict_list(self, opportunities: List[YieldOpportunity]) -> List[Dict]:
+        """Convert opportunities to list of dictionaries"""
         
         data = []
         for opp in opportunities:
@@ -17,28 +17,47 @@ class YieldDataProcessor:
                 'tvl': opp.tvl,
                 'category': opp.category,
                 'audit_score': opp.risks.get('audit_score', 0.5),
-                'pool_id': opp.pool_id
+                'pool_id': opp.pool_id,
+                'apy_percent': opp.apy * 100,
+                'risk_adjusted_apy': opp.apy * opp.risks.get('audit_score', 0.5)
             })
         
-        df = pd.DataFrame(data)
-        df['apy_percent'] = df['apy'] * 100
-        df['risk_adjusted_apy'] = df['apy'] * df['audit_score']
-        
-        return df
+        return data
     
     def get_summary_stats(self, opportunities: List[YieldOpportunity]) -> Dict:
-        """Get summary statistics"""
+        """Get summary statistics without pandas"""
         
         if not opportunities:
             return {'error': 'No opportunities'}
         
-        df = self.to_dataframe(opportunities)
+        data = self.to_dict_list(opportunities)
+        
+        # Basic calculations
+        total_opportunities = len(opportunities)
+        protocols = set(opp['protocol'] for opp in data)
+        total_protocols = len(protocols)
+        
+        # TVL and APY calculations
+        total_tvl = sum(opp['tvl'] for opp in data)
+        average_apy = sum(opp['apy'] for opp in data) / len(data) if data else 0
+        
+        # Category distribution
+        categories = Counter(opp['category'] for opp in data)
+        
+        # Top protocols by TVL
+        protocol_tvl = defaultdict(float)
+        for opp in data:
+            protocol_tvl[opp['protocol']] += opp['tvl']
+        
+        top_protocols = dict(
+            sorted(protocol_tvl.items(), key=lambda x: x[1], reverse=True)[:5]
+        )
         
         return {
-            'total_opportunities': len(opportunities),
-            'total_protocols': df['protocol'].nunique(),
-            'total_tvl': df['tvl'].sum(),
-            'average_apy': df['apy'].mean(),
-            'categories': df['category'].value_counts().to_dict(),
-            'top_protocols': df.groupby('protocol')['tvl'].sum().sort_values(ascending=False).head(5).to_dict()
+            'total_opportunities': total_opportunities,
+            'total_protocols': total_protocols,
+            'total_tvl': total_tvl,
+            'average_apy': average_apy,
+            'categories': dict(categories),
+            'top_protocols': top_protocols
         }

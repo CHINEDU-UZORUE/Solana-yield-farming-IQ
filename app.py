@@ -175,19 +175,15 @@ async def get_analytics():
             raise HTTPException(status_code=404, detail="No yield data available")
         
         processor = YieldDataProcessor()
-        df = processor.to_dataframe(opportunities)
-        
-        # Calculate analytics
-        category_counts = df['category'].value_counts().to_dict()
-        top_protocols = df.groupby('protocol')['tvl'].sum().sort_values(ascending=False).head(5).to_dict()
+        stats = processor.get_summary_stats(opportunities)
         
         return AnalyticsResponse(
-            total_opportunities=len(opportunities),
-            total_protocols=df['protocol'].nunique(),
-            total_tvl=float(df['tvl'].sum()),
-            average_apy=float(df['apy'].mean()),
-            categories=category_counts,
-            top_protocols=top_protocols
+            total_opportunities=stats['total_opportunities'],
+            total_protocols=stats['total_protocols'],
+            total_tvl=stats['total_tvl'],
+            average_apy=stats['average_apy'],
+            categories=stats['categories'],
+            top_protocols=stats['top_protocols']
         )
         
     except Exception as e:
