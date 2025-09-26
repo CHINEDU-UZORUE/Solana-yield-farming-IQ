@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 class RiskScorer:
     """Calculate risk scores for yield opportunities"""
