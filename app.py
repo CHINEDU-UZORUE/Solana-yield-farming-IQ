@@ -143,7 +143,7 @@ async def get_yields(
                     apy=opp.apy,
                     tvl=opp.tvl,
                     category=opp.category,
-                    tokens=opp.tokens or [],
+                    tokens=opp.tokens,
                     audit_score=opp.risks.get('audit_score', 0.5),
                     risk_level=risk_data['risk_level'],
                     last_updated=opp.last_updated.isoformat()
