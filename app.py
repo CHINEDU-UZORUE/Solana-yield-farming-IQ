@@ -104,30 +104,67 @@ async def get_yields(
     try:
         opportunities = await get_cached_yields()
         
-        # Apply filters and transform to frontend format
-        filtered = [
-            {
-                "id": o.pool_id,  # Match frontend's id
-                "protocol": o.protocol,
-                "pool": o.pair,   # Match frontend's pool
-                "apy": o.apy,
-                "tvl": o.tvl,
-                "category": o.category,
-                "risk": o.risks.get('risk_level', 'Medium')  # Match frontend's risk
-            }
-            for o in opportunities
-            if min_apy <= o.apy <= max_apy
-            and (not categories or o.category in categories.split(','))
-        ]
+        if not opportunities:
+            return []
+
+        filtered_opportunities = opportunities.copy()
+
+        # 🔎 Exclude outliers
+        if exclude_outliers:
+            filtered_opportunities = [opp for opp in filtered_opportunities if not getattr(opp, "outlier", False)]
         
-        return {"yields": filtered}
+        # Filter by APY
+        if min_apy > 0:
+            filtered_opportunities = [opp for opp in filtered_opportunities if opp.apy >= min_apy]
+        
+        # Filter by TVL
+        if min_tvl > 0:
+            filtered_opportunities = [opp for opp in filtered_opportunities if opp.tvl >= min_tvl]
+        
+        # Filter by categories
+        if categories:
+            category_list = [cat.strip().lower() for cat in categories.split(',')]
+            filtered_opportunities = [opp for opp in filtered_opportunities if opp.category.lower() in category_list]
+        
+        # Sort by APY descending and limit
+        filtered_opportunities.sort(key=lambda x: x.apy, reverse=True)
+        filtered_opportunities = filtered_opportunities[:limit]
+        
+        # Build response
+        risk_scorer = RiskScorer()
+        response_data = []
+        errors_count = 0   # ✅ Initialize errors counter
+        for opp in filtered_opportunities:
+            try:
+                risk_data = risk_scorer.calculate_risk_score(opp.protocol, opp.tvl, opp.apy)
+                response_data.append(YieldResponse(
+                    protocol=opp.protocol,
+                    pool_id=opp.pool_id,
+                    pair=opp.pair,
+                    apy=opp.apy,
+                    tvl=opp.tvl,
+                    category=opp.category,
+                    tokens=opp.tokens or [],
+                    audit_score=opp.risks.get('audit_score', 0.5),
+                    risk_level=risk_data['risk_level'],
+                    last_updated=opp.last_updated.isoformat()
+                ))
+            except Exception as e:
+                errors_count += 1
+                logger.warning(f"Error processing opportunity {opp.protocol}: {e}")
+                continue
+        
+        logger.info(f"Successfully processed {len(response_data)} opportunities, {errors_count} errors")
+        return response_data
+
     except Exception as e:
         logger.error(f"Error in get_yields: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/analytics", response_model=AnalyticsResponse)
-async def get_analytics():
-    """Get yield analytics"""
+
+@app.get("/api/analytics")
+async def get_analytics(exclude_outliers: bool = Query(True)):
+    """Get market analytics summary"""
     try:
         opportunities = await get_cached_yields()
         stats = YieldDataProcessor().get_summary_stats(opportunities)
