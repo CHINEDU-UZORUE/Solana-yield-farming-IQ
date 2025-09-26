@@ -97,8 +97,9 @@ async def root():
 @app.get("/api/yields")
 async def get_yields(
     min_apy: float = Query(0.0, ge=0.0, description="Minimum APY (as decimal, e.g., 0.05 for 5%)"),
-    max_apy: float = Query(10000.0, description="Maximum APY"),
-    categories: Optional[str] = Query(None, description="Comma-separated categories to filter")
+    min_tvl: int = Query(0, ge=0, description="Minimum TVL in USD"),
+    categories: Optional[str] = Query(None, description="Comma-separated categories"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of results")
 ):
     """Get filtered Solana yield opportunities"""
     try:
@@ -107,11 +108,8 @@ async def get_yields(
         if not opportunities:
             return []
         
+        # Apply filters
         filtered_opportunities = opportunities.copy()
-
-        # 🔎 Exclude outliers
-        if exclude_outliers:
-            filtered_opportunities = [opp for opp in filtered_opportunities if not getattr(opp, "outlier", False)]
         
         # Filter by APY
         if min_apy > 0:
@@ -126,13 +124,15 @@ async def get_yields(
             category_list = [cat.strip().lower() for cat in categories.split(',')]
             filtered_opportunities = [opp for opp in filtered_opportunities if opp.category.lower() in category_list]
         
-        # Sort by APY descending and limit
+        # Sort by APY descending and limit results
         filtered_opportunities.sort(key=lambda x: x.apy, reverse=True)
         filtered_opportunities = filtered_opportunities[:limit]
         
-        # Build response
+        # Calculate risk scores and convert to response format
         risk_scorer = RiskScorer()
         response_data = []
+        errors_count = 0
+        
         for opp in filtered_opportunities:
             try:
                 risk_data = risk_scorer.calculate_risk_score(opp.protocol, opp.tvl, opp.apy)
@@ -174,27 +174,26 @@ async def get_yields(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/analytics")
-async def get_analytics(exclude_outliers: bool = Query(True)):
+async def get_analytics():
     """Get market analytics summary"""
     try:
         opportunities = await get_cached_yields()
-        stats = YieldDataProcessor().get_summary_stats(opportunities)
         
-        # Transform to match frontend format
-        return {
-            "marketOverview": {
-                "totalMarketCap": stats["total_tvl"] / 1e9,  # In billions
-                "totalVolume24h": 156.7,  # Placeholder; add if available
-                "activeProtocols": stats["total_protocols"],
-                "avgYieldChange": stats["average_apy"],
-                "riskIndex": 6.8,  # Placeholder; compute average risk if possible
-                "marketSentiment": "Bullish"  # Placeholder
-            },
-            "categoryDistribution": [
-                {"name": cat, "value": count, "color": "#9945FF"}  # Add colors as needed
-                for cat, count in stats["categories"].items()
-            ]
-        }
+        if not opportunities:
+            raise HTTPException(status_code=404, detail="No yield data available")
+        
+        processor = YieldDataProcessor()
+        stats = processor.get_summary_stats(opportunities)
+        
+        return AnalyticsResponse(
+            total_opportunities=stats['total_opportunities'],
+            total_protocols=stats['total_protocols'],
+            total_tvl=stats['total_tvl'],
+            average_apy=stats['average_apy'],
+            categories=stats['categories'],
+            top_protocols=stats['top_protocols']
+        )
+        
     except Exception as e:
         logger.error(f"Error in get_analytics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
