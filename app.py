@@ -2,8 +2,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
-import asyncio
+from typing import List, Optional, Dict
 from datetime import datetime, timedelta
 import logging
 
