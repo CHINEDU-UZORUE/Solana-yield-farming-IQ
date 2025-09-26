@@ -1,14 +1,11 @@
-from typing import Dict, List, Optional
+import numpy as np
+from typing import Dict, List
 
 class RiskScorer:
     """Calculate risk scores for yield opportunities"""
     
-    def calculate_risk_score(self, protocol: str, tvl: float, apy: float, apy_mean_30d: Optional[float] = None) -> Dict:
-        """Calculate comprehensive risk score using APY and optional 30-day mean"""
-        
-        # Input validation
-        if tvl < 0 or apy < 0:
-            raise ValueError("TVL and APY must be non-negative")
+    def calculate_risk_score(self, protocol: str, tvl: float, apy: float) -> Dict:
+        """Calculate comprehensive risk score"""
         
         # TVL score (higher TVL = lower risk)
         tvl_score = min(1.0, tvl / 10_000_000)
@@ -16,22 +13,8 @@ class RiskScorer:
         # Protocol score
         protocol_score = self._get_protocol_score(protocol)
         
-        # APY risk (very high APY = higher risk) - adjusted for percentage APY (e.g., 0.5 = 0.5%, 5 = 5%)
-        effective_apy = apy_mean_30d if apy_mean_30d is not None else apy  # Use 30d mean if available
-        if effective_apy < 0.5:  # Less than 0.5% APY
-            apy_risk = 1.0
-        elif effective_apy < 5:  # 0.5-5% APY
-            apy_risk = 0.9
-        elif effective_apy < 50:  # 5-50% APY
-            apy_risk = 0.7
-        elif effective_apy < 200:  # 50-200% APY
-            apy_risk = 0.5
-        elif effective_apy < 500:  # 200-500% APY
-            apy_risk = 0.3
-        elif effective_apy < 2000:  # 500-2000% APY
-            apy_risk = 0.2
-        else:  # Very high APY (>2000%)
-            apy_risk = 0.1
+        # APY risk (very high APY = higher risk)
+        apy_risk = 1.0 if apy < 0.5 else max(0.3, 1 - (apy - 0.5) / 2)
         
         # Overall score
         weights = {'tvl': 0.3, 'protocol': 0.4, 'apy': 0.3}
@@ -55,18 +38,10 @@ class RiskScorer:
         """Score protocol based on reputation"""
         scores = {
             'raydium': 0.95, 'orca': 0.95, 'solend': 0.9,
-            'marinade': 0.9, 'jito-liquid-staking': 0.9, 'mango': 0.8,
-            'port': 0.8, 'drift': 0.75, 'saber': 0.75, 'sunny': 0.7,
-            'kamino': 0.8, 'marginfi': 0.75
+            'marinade': 0.9, 'mango': 0.8, 'port': 0.8,
+            'drift': 0.75, 'saber': 0.75, 'sunny': 0.7
         }
-        protocol_lower = protocol.lower()
-        
-        # Check if any known protocol name is in the protocol string
-        for known_protocol, score in scores.items():
-            if known_protocol in protocol_lower:
-                return score
-                
-        return 0.5  # Default for unknown protocols
+        return scores.get(protocol.lower(), 0.5)
     
     def _get_risk_level(self, score: float) -> str:
         """Convert score to risk level"""
@@ -79,6 +54,7 @@ class RiskScorer:
         else:
             return "Very High Risk"
 
+# In models.py
 class PortfolioOptimizer:
     def find_optimal_allocation(self, opportunities: List[Dict], 
                               investment: float, risk_tolerance: str) -> List[Dict]:
