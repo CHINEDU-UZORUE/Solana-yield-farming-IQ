@@ -51,7 +51,6 @@ app = FastAPI(
 
 import os
 
-# CORS configuration using environment variables
 
 app.add_middleware(
     CORSMiddleware,
@@ -135,6 +134,7 @@ async def get_yields(
         # Calculate risk scores and convert to response format
         risk_scorer = RiskScorer()
         response_data = []
+        errors_count = 0
         
         for opp in filtered_opportunities:
             try:
@@ -152,8 +152,23 @@ async def get_yields(
                     last_updated=opp.last_updated.isoformat()
                 ))
             except Exception as e:
-                logger.warning(f"Error processing opportunity {opp.protocol}: {e}")
-                continue
+                errors_count += 1
+                logger.error(f"Error processing opportunity {opp.protocol}: {e}")
+                # Don't skip - include with default risk level
+                response_data.append(YieldResponse(
+                    protocol=opp.protocol,
+                    pool_id=opp.pool_id,
+                    pair=opp.pair,
+                    apy=opp.apy,
+                    tvl=opp.tvl,
+                    category=opp.category,
+                    tokens=opp.tokens,
+                    audit_score=opp.risks.get('audit_score', 0.5),
+                    risk_level="Medium Risk",  # Default risk level
+                    last_updated=opp.last_updated.isoformat()
+                ))
+        
+        logger.info(f"Processed {len(response_data)} opportunities with {errors_count} errors")
         
         return response_data
         

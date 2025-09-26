@@ -12,8 +12,15 @@ class RiskScorer:
         # Protocol score
         protocol_score = self._get_protocol_score(protocol)
         
-        # APY risk (very high APY = higher risk)
-        apy_risk = 1.0 if apy < 0.5 else max(0.3, 1 - (apy - 0.5) / 2)
+        # APY risk (very high APY = higher risk) - adjusted for DeFi scale
+        if apy < 50:  # Less than 50% APY
+            apy_risk = 1.0
+        elif apy < 500:  # 50-500% APY
+            apy_risk = 0.8
+        elif apy < 5000:  # 500-5000% APY  
+            apy_risk = 0.5
+        else:  # Very high APY
+            apy_risk = 0.2
         
         # Overall score
         weights = {'tvl': 0.3, 'protocol': 0.4, 'apy': 0.3}
@@ -38,9 +45,17 @@ class RiskScorer:
         scores = {
             'raydium': 0.95, 'orca': 0.95, 'solend': 0.9,
             'marinade': 0.9, 'mango': 0.8, 'port': 0.8,
-            'drift': 0.75, 'saber': 0.75, 'sunny': 0.7
+            'drift': 0.75, 'saber': 0.75, 'sunny': 0.7,
+            'kamino': 0.8, 'marginfi': 0.75
         }
-        return scores.get(protocol.lower(), 0.5)
+        protocol_lower = protocol.lower()
+        
+        # Check if any known protocol name is in the protocol string
+        for known_protocol, score in scores.items():
+            if known_protocol in protocol_lower:
+                return score
+                
+        return 0.5  # Default for unknown protocols
     
     def _get_risk_level(self, score: float) -> str:
         """Convert score to risk level"""
@@ -53,7 +68,6 @@ class RiskScorer:
         else:
             return "Very High Risk"
 
-# In models.py
 class PortfolioOptimizer:
     def find_optimal_allocation(self, opportunities: List[Dict], 
                               investment: float, risk_tolerance: str) -> List[Dict]:
