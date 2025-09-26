@@ -2,13 +2,12 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
-import asyncio
+from typing import List, Optional, Dict
 from datetime import datetime, timedelta
 import logging
 
-# Import your existing modules
-from src.collector import get_all_solana_yields, YieldOpportunity
+# Import existing modules (adjust paths if necessary)
+from src.collector import get_all_solana_yields
 from src.processor import YieldDataProcessor
 from src.models import RiskScorer, PortfolioOptimizer
 
@@ -49,9 +48,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-import os
-
-
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -100,163 +97,106 @@ async def root():
 @app.get("/api/yields")
 async def get_yields(
     min_apy: float = Query(0.0, ge=0.0, description="Minimum APY (as decimal, e.g., 0.05 for 5%)"),
-    min_tvl: int = Query(0, ge=0, description="Minimum TVL in USD"),
-    categories: Optional[str] = Query(None, description="Comma-separated categories"),
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of results"),
-    exclude_outliers: bool = Query(True, description="Exclude pools flagged as outliers")
+    max_apy: float = Query(10000.0, description="Maximum APY"),
+    categories: Optional[str] = Query(None, description="Comma-separated categories to filter")
 ):
-    """Get Solana yield opportunities with filters"""
+    """Get filtered Solana yield opportunities"""
     try:
         opportunities = await get_cached_yields()
         
-        if not opportunities:
-            return []
-
-        filtered_opportunities = opportunities.copy()
-
-        # 🔎 Exclude outliers
-        if exclude_outliers:
-            filtered_opportunities = [opp for opp in filtered_opportunities if not getattr(opp, "outlier", False)]
+        # Apply filters and transform to frontend format
+        filtered = [
+            {
+                "id": o.pool_id,  # Match frontend's id
+                "protocol": o.protocol,
+                "pool": o.pair,   # Match frontend's pool
+                "apy": o.apy,
+                "tvl": o.tvl,
+                "category": o.category,
+                "risk": o.risks.get('risk_level', 'Medium')  # Match frontend's risk
+            }
+            for o in opportunities
+            if min_apy <= o.apy <= max_apy
+            and (not categories or o.category in categories.split(','))
+        ]
         
-        # Filter by APY
-        if min_apy > 0:
-            filtered_opportunities = [opp for opp in filtered_opportunities if opp.apy >= min_apy]
-        
-        # Filter by TVL
-        if min_tvl > 0:
-            filtered_opportunities = [opp for opp in filtered_opportunities if opp.tvl >= min_tvl]
-        
-        # Filter by categories
-        if categories:
-            category_list = [cat.strip().lower() for cat in categories.split(',')]
-            filtered_opportunities = [opp for opp in filtered_opportunities if opp.category.lower() in category_list]
-        
-        # Sort by APY descending and limit
-        filtered_opportunities.sort(key=lambda x: x.apy, reverse=True)
-        filtered_opportunities = filtered_opportunities[:limit]
-        
-        # Build response
-        risk_scorer = RiskScorer()
-        response_data = []
-        errors_count = 0   # ✅ Initialize errors counter
-        for opp in filtered_opportunities:
-            try:
-                risk_data = risk_scorer.calculate_risk_score(opp.protocol, opp.tvl, opp.apy)
-                response_data.append(YieldResponse(
-                    protocol=opp.protocol,
-                    pool_id=opp.pool_id,
-                    pair=opp.pair,
-                    apy=opp.apy,
-                    tvl=opp.tvl,
-                    category=opp.category,
-                    tokens=opp.tokens or [],
-                    audit_score=opp.risks.get('audit_score', 0.5),
-                    risk_level=risk_data['risk_level'],
-                    last_updated=opp.last_updated.isoformat()
-                ))
-            except Exception as e:
-                errors_count += 1
-                logger.warning(f"Error processing opportunity {opp.protocol}: {e}")
-                continue
-        
-        logger.info(f"Successfully processed {len(response_data)} opportunities, {errors_count} errors")
-        return response_data
-
+        return {"yields": filtered}
     except Exception as e:
-        logger.error(f"Error in get_yields endpoint: {e}")
+        logger.error(f"Error in get_yields: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-@app.get("/api/analytics")
-async def get_analytics(exclude_outliers: bool = Query(True)):
-    """Get market analytics summary"""
+@app.get("/api/analytics", response_model=AnalyticsResponse)
+async def get_analytics():
+    """Get yield analytics"""
     try:
         opportunities = await get_cached_yields()
+        stats = YieldDataProcessor().get_summary_stats(opportunities)
         
-        if not opportunities:
-            raise HTTPException(status_code=404, detail="No yield data available")
-        
-        if exclude_outliers:
-            opportunities = [opp for opp in opportunities if not getattr(opp, "outlier", False)]
-        
-        processor = YieldDataProcessor()
-        stats = processor.get_summary_stats(opportunities)
-        
-        return AnalyticsResponse(
-            total_opportunities=stats['total_opportunities'],
-            total_protocols=stats['total_protocols'],
-            total_tvl=stats['total_tvl'],
-            average_apy=stats['average_apy'],
-            categories=stats['categories'],
-            top_protocols=stats['top_protocols']
-        )
-      
+        # Transform to match frontend format
+        return {
+            "marketOverview": {
+                "totalMarketCap": stats["total_tvl"] / 1e9,  # In billions
+                "totalVolume24h": 156.7,  # Placeholder; add if available
+                "activeProtocols": stats["total_protocols"],
+                "avgYieldChange": stats["average_apy"],
+                "riskIndex": 6.8,  # Placeholder; compute average risk if possible
+                "marketSentiment": "Bullish"  # Placeholder
+            },
+            "categoryDistribution": [
+                {"name": cat, "value": count, "color": "#9945FF"}  # Add colors as needed
+                for cat, count in stats["categories"].items()
+            ]
+        }
     except Exception as e:
         logger.error(f"Error in get_analytics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/optimize")
+@app.post("/api/portfolio")  # Match frontend proxy
 async def optimize_portfolio(request: OptimizeRequest):
-    """Generate optimal portfolio allocation"""
+    """Optimize portfolio allocation"""
     try:
-        # Validate input
-        if request.investment_amount <= 0:
-            raise HTTPException(status_code=400, detail="Investment amount must be positive")
-        
-        if request.risk_tolerance not in ["Conservative", "Moderate", "Aggressive"]:
-            raise HTTPException(status_code=400, detail="Invalid risk tolerance")
-        
         opportunities = await get_cached_yields()
         
-        if not opportunities:
-            raise HTTPException(status_code=404, detail="No yield data available for optimization")
-        
-        # Calculate risk scores and prepare data
-        risk_scorer = RiskScorer()
-        optimizer = PortfolioOptimizer()
-        
-        opp_data = []
-        for opp in opportunities:
-            try:
-                risk_data = risk_scorer.calculate_risk_score(opp.protocol, opp.tvl, opp.apy)
-                opp_data.append({
-                    'protocol': opp.protocol,
-                    'pair': opp.pair,
-                    'apy': opp.apy,
-                    'tvl': opp.tvl,
-                    'audit_score': opp.risks.get('audit_score', 0.5),
-                    'risk_level': risk_data['risk_level']
-                })
-            except Exception as e:
-                logger.warning(f"Error processing opportunity for optimization {opp.protocol}: {e}")
-                continue
+        # Prepare opportunity data with risk scores
+        opp_data = [
+            {
+                'protocol': opp.protocol,
+                'pair': opp.pair,
+                'apy': opp.apy,
+                'tvl': opp.tvl,
+                'audit_score': opp.risks.get('audit_score', 0.5),
+                'risk_level': RiskScorer().calculate_risk_score(opp.protocol, opp.tvl, opp.apy)['risk_level']
+            }
+            for opp in opportunities
+        ]
         
         if not opp_data:
             raise HTTPException(status_code=400, detail="No valid opportunities available for optimization")
         
         # Get optimal allocation
-        allocations = optimizer.find_optimal_allocation(
+        allocations = PortfolioOptimizer().find_optimal_allocation(
             opp_data, request.investment_amount, request.risk_tolerance
         )
         
         if not allocations:
             raise HTTPException(status_code=400, detail="No optimal allocation found for given parameters")
         
-        # Calculate summary metrics
-        total_apy = sum(a['allocation_amount'] * a['expected_apy'] for a in allocations) / request.investment_amount
+        # Transform to match frontend format
+        allocations = [
+            {
+                "id": f"id-{i}",
+                "protocol": a["protocol"],
+                "pool": a["pair"],
+                "allocation": a["allocation_amount"],
+                "percentage": a["allocation_percentage"],
+                "expectedApy": a["expected_apy"],
+                "risk": a.get("risk_level", "Medium")
+            }
+            for i, a in enumerate(allocations)
+        ]
         
-        return {
-            "strategy": {
-                "expected_apy": total_apy,
-                "annual_yield": request.investment_amount * total_apy,
-                "total_positions": len(allocations),
-                "risk_tolerance": request.risk_tolerance,
-                "time_horizon": request.time_horizon
-            },
-            "allocations": allocations,
-            "generated_at": datetime.now().isoformat()
-        }
-        
+        return {"data": allocations}
+    
     except HTTPException:
         raise
     except Exception as e:
@@ -267,9 +207,8 @@ async def optimize_portfolio(request: OptimizeRequest):
 async def health_check():
     """Detailed health check"""
     try:
-        # Test data fetching
         opportunities = await get_cached_yields()
-        data_status = "healthy" if opportunities else "no_data"
+        data_status = 'healthy' if opportunities else 'no_data'
         
         return {
             "status": "healthy",
