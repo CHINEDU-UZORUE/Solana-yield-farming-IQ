@@ -1,0 +1,143 @@
+[33mcommit b8b11ca688c688fc3b02066c877a1e295348a123[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 16:40:26 2025 +0100
+
+    models
+
+[33mcommit 25c6665ecfb4916724d06f798a7c807267999867[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 16:39:19 2025 +0100
+
+    models
+
+[33mcommit 54d389ca81d375c7527a313d413cbf6c658fd1b5[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 16:37:31 2025 +0100
+
+    treated outlier apys
+
+[33mcommit 5b9045d6e88713511270fda5c2868a4456db86d8[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 05:15:44 2025 +0100
+
+    app
+
+[33mcommit eeb1f199dbe115682098b32f5a56ffd885da0f8d[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 05:13:21 2025 +0100
+
+    app
+
+[33mcommit f99548e69a05693a41dfec836a5585e819fe72eb[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 04:50:32 2025 +0100
+
+    app
+
+[33mcommit aa6261a55ed64eb5f2858602866612e8364d957a[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 04:46:32 2025 +0100
+
+    mod models and app
+
+[33mcommit 3005a839fd6d793441db610e90650d3c32522d2a[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 04:38:48 2025 +0100
+
+    modified collector.py and app.py
+
+[33mcommit 4e8aae5216ab08b48d32521fae5c9a7891a1ce37[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 04:27:45 2025 +0100
+
+    modified collector.py
+
+[33mcommit 116d4516112549e867e3c821864afc6e2307a762[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 04:20:58 2025 +0100
+
+    modified collector.py
+
+[33mcommit a61b575ce7de9cf574908296faf0d715d5877af6[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 04:11:46 2025 +0100
+
+    removed numpy
+
+[33mcommit 97c842a15d43802dac625442bbec0f2a2f152774[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 02:45:44 2025 +0100
+
+    mod
+
+[33mcommit afae52b76bbddec3e608f5800316ae18a02fa193[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 01:48:28 2025 +0100
+
+    mod
+
+[33mcommit 5ff55f43eb63f97f10c274e080ac9d31b7e1a0dd[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 01:46:11 2025 +0100
+
+    added runtime
+
+[33mcommit 9ce1a191c7a5e9eb81297e9cf5ad1d75c1b7ef46[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 01:20:39 2025 +0100
+
+    changed aiohttp to httpx
+
+[33mcommit 5ce7ed89cef008616b51f5eff98d4c8d34981dd2[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 01:14:27 2025 +0100
+
+    more changes to requirements
+
+[33mcommit ad994e0998e1408158c05f58ad9235591f7ec3a6[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 01:08:55 2025 +0100
+
+    more changes to app and requirements
+
+[33mcommit c652ba0550d1aaad120a6275abd9c6cb7ce37be8[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 01:02:51 2025 +0100
+
+    new changes
+
+[33mcommit f1a2fd8965119c0a61669f515bed9393dc786916[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 00:54:59 2025 +0100
+
+    mod requirements
+
+[33mcommit 6713c11ff6000678ef63979f99dd33e309deeb5c[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 00:52:52 2025 +0100
+
+    mod requirements
+
+[33mcommit e9f132df1fb863bcdd444599c3e6859c48dabb42[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 00:30:40 2025 +0100
+
+    modified app.py
+
+[33mcommit 18c8e37e1a2f88806094f99a3a716382060ce2d6[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 00:28:27 2025 +0100
+
+     added runtime for render compatibility
+
+[33mcommit 3b294af5b1ad20b22543a0ffe28dd757ff2497eb[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Fri Sep 26 00:07:15 2025 +0100
+
+    modified app.py
+
+[33mcommit a8b37d1c0342d841381ff3f3e439bd8ed1bd2e5e[m
+Author: Chinedu Uzorue <uzoruechinedu@gmail.com>
+Date:   Thu Sep 25 23:58:04 2025 +0100
+
+    first commit
