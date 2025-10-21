@@ -98,72 +98,41 @@ async def root():
 
 @app.get("/api/yields")
 async def get_yields(
-    min_apy: float = Query(0.001, ge=0.001, description="Minimum APY (as decimal)"),
+    min_apy: float = Query(0.1, ge=0.1, description="Minimum APY (in percentage)"),
     min_tvl: int = Query(10000, ge=0, description="Minimum TVL in USD"),
     categories: Optional[str] = Query(None, description="Comma-separated categories"),
     limit: int = Query(100, ge=1, le=500, description="Maximum number of results"),
-    max_apy: float = Query(0.5, ge=0.0, le=2.0, description="Maximum APY (as decimal)")
+    max_apy: float = Query(50.0, ge=0.0, le=200.0, description="Maximum APY (in percentage)")
 ):
     """Get Solana yield opportunities with filters"""
     try:
         opportunities = await get_cached_yields()
-        
         if not opportunities:
             return []
-        
-        # Initialize processor with custom max APY threshold
+            
         processor = YieldDataProcessor(max_apy_threshold=max_apy)
+        processed_data = processor.to_dict_list(opportunities)
         
-        # Remove outliers first
-        filtered_opportunities = processor.remove_outliers(opportunities)
-        
-        # Apply filters
-        filtered_opportunities = filtered_opportunities.copy()
-        
-        # Filter by APY
-        if min_apy > 0:
-            filtered_opportunities = [opp for opp in filtered_opportunities if opp.apy >= min_apy]
-        
-        # Filter by TVL
-        if min_tvl > 0:
-            filtered_opportunities = [opp for opp in filtered_opportunities if opp.tvl >= min_tvl]
-        
-        # Filter by categories
+        # Filter by categories if specified
         if categories:
-            category_list = [cat.strip().lower() for cat in categories.split(',')]
-            filtered_opportunities = [opp for opp in filtered_opportunities if opp.category.lower() in category_list]
+            category_list = [c.strip() for c in categories.split(',')]
+            processed_data = [
+                opp for opp in processed_data 
+                if opp['category'] in category_list
+            ]
+            
+        # Apply other filters
+        filtered_data = [
+            opp for opp in processed_data
+            if opp['apy'] >= min_apy and opp['tvl'] >= min_tvl
+        ]
         
-        # Sort by APY descending and limit results
-        filtered_opportunities.sort(key=lambda x: x.apy, reverse=True)
-        filtered_opportunities = filtered_opportunities[:limit]
+        # Sort by APY descending and apply limit
+        sorted_data = sorted(filtered_data, key=lambda x: x['apy'], reverse=True)[:limit]
         
-        # Calculate risk scores and convert to response format
-        risk_scorer = RiskScorer()
-        response_data = []
-        
-        for opp in filtered_opportunities:
-            try:
-                risk_data = risk_scorer.calculate_risk_score(opp.protocol, opp.tvl, opp.apy)
-                response_data.append(YieldResponse(
-                    protocol=opp.protocol,
-                    pool_id=opp.pool_id,
-                    pair=opp.pair,
-                    apy=opp.apy,
-                    tvl=opp.tvl,
-                    category=opp.category,
-                    tokens=opp.tokens or [],
-                    audit_score=opp.risks.get('audit_score', 0.5),
-                    risk_level=risk_data['risk_level'],
-                    last_updated=opp.last_updated.isoformat()
-                ))
-            except Exception as e:
-                logger.warning(f"Error processing opportunity {opp.protocol}: {e}")
-                continue
-        
-        return response_data
+        return sorted_data
         
     except Exception as e:
-        logger.error(f"Error in get_yields: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/analytics")

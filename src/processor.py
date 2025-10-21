@@ -7,15 +7,19 @@ from datetime import datetime
 class YieldDataProcessor:
     """Process yield data for analysis without pandas dependency"""
     
-    def __init__(self, max_apy_threshold: float = 0.5):  # 50% APY max by default
+    def __init__(self, max_apy_threshold: float = 50.0):  # 50% APY max by default
         self.max_apy_threshold = max_apy_threshold
-        self.min_apy_threshold = 0.001  # 0.1% minimum APY
+        self.min_apy_threshold = 0.1  # 0.1% minimum APY
         self.min_tvl_threshold = 10000  # $10,000 minimum TVL
     
     def remove_outliers(self, opportunities: List[YieldOpportunity]) -> List[YieldOpportunity]:
         """Remove statistical outliers from APY values using multiple criteria"""
         if not opportunities:
             return []
+            
+        # Convert APY to percentage before filtering
+        for opp in opportunities:
+            opp.apy = opp.apy * 100 if opp.apy < 1 else opp.apy
             
         # First filter by basic thresholds
         basic_filtered = [
@@ -27,55 +31,46 @@ class YieldDataProcessor:
         if not basic_filtered:
             return []
             
-        # Then apply statistical filtering
+        # Apply statistical filtering
         apys = [opp.apy for opp in basic_filtered]
         
         try:
             avg = mean(apys)
             std = stdev(apys)
             
-            # Use more conservative bounds (1.5 standard deviations)
             upper_bound = min(avg + 1.5 * std, self.max_apy_threshold)
             lower_bound = max(self.min_apy_threshold, avg - 1.5 * std)
             
-            # Apply multiple filtering criteria
             filtered = [
                 opp for opp in basic_filtered
                 if all([
-                    lower_bound <= opp.apy <= upper_bound,  # Within statistical bounds
-                    opp.apy <= self.max_apy_threshold,      # Below absolute maximum
-                    opp.apy >= self.min_apy_threshold,      # Above absolute minimum
-                    opp.tvl >= self.min_tvl_threshold       # Sufficient liquidity
+                    lower_bound <= opp.apy <= upper_bound,
+                    opp.apy <= self.max_apy_threshold,
+                    opp.apy >= self.min_apy_threshold,
+                    opp.tvl >= self.min_tvl_threshold
                 ])
             ]
             
             return filtered
+            
         except Exception as e:
-            # Fallback to simple threshold if statistical calculation fails
-            return [
-                opp for opp in opportunities 
-                if (self.min_apy_threshold <= opp.apy <= self.max_apy_threshold and 
-                    opp.tvl >= self.min_tvl_threshold)
-            ]
-    
+            return basic_filtered
+
     def to_dict_list(self, opportunities: List[YieldOpportunity]) -> List[Dict]:
         """Convert opportunities to list of dictionaries"""
-        
-        # First remove outliers
         filtered_opportunities = self.remove_outliers(opportunities)
         
         data = []
         for opp in filtered_opportunities:
+            # APY should already be in percentage form from remove_outliers
             data.append({
                 'protocol': opp.protocol,
                 'pair': opp.pair,
-                'apy': opp.apy * 100,  # Convert to percentage
+                'apy': opp.apy,  # Already in percentage
                 'tvl': opp.tvl,
                 'category': opp.category,
                 'audit_score': opp.risks.get('audit_score', 0.5),
                 'pool_id': opp.pool_id,
-                'apy_percent': opp.apy * 100,  # Additional field for percentage display
-                'risk_adjusted_apy': (opp.apy * 100) * opp.risks.get('audit_score', 0.5),
                 'tokens': opp.tokens,
                 'risk_level': self._get_risk_level(opp),
                 'last_updated': datetime.now().isoformat()
