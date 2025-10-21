@@ -2,6 +2,7 @@ from typing import List, Dict
 from collections import Counter, defaultdict
 from statistics import mean, stdev
 from .collector import YieldOpportunity
+from datetime import datetime
 
 class YieldDataProcessor:
     """Process yield data for analysis without pandas dependency"""
@@ -68,13 +69,16 @@ class YieldDataProcessor:
             data.append({
                 'protocol': opp.protocol,
                 'pair': opp.pair,
-                'apy': opp.apy,
+                'apy': opp.apy * 100,  # Convert to percentage
                 'tvl': opp.tvl,
                 'category': opp.category,
                 'audit_score': opp.risks.get('audit_score', 0.5),
                 'pool_id': opp.pool_id,
-                'apy_percent': opp.apy,
-                'risk_adjusted_apy': opp.apy * opp.risks.get('audit_score', 0.5)
+                'apy_percent': opp.apy * 100,  # Additional field for percentage display
+                'risk_adjusted_apy': (opp.apy * 100) * opp.risks.get('audit_score', 0.5),
+                'tokens': opp.tokens,
+                'risk_level': self._get_risk_level(opp),
+                'last_updated': datetime.now().isoformat()
             })
         
         return data
@@ -122,3 +126,12 @@ class YieldDataProcessor:
             'top_protocols': top_protocols,
             'filtered_count': len(opportunities) - total_opportunities  # Number of filtered outliers
         }
+
+    def _get_risk_level(self, opportunity: YieldOpportunity) -> str:
+        """Determine risk level based on opportunity characteristics"""
+        if opportunity.risks.get('audit_score', 0.5) >= 0.9:
+            return 'Low'
+        elif opportunity.risks.get('audit_score', 0.5) >= 0.7:
+            return 'Medium'
+        else:
+            return 'High'
