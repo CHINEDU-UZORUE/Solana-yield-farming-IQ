@@ -6,35 +6,56 @@ from .collector import YieldOpportunity
 class YieldDataProcessor:
     """Process yield data for analysis without pandas dependency"""
     
-    def __init__(self, max_apy_threshold: float = 2.0):  # 200% APY max by default
+    def __init__(self, max_apy_threshold: float = 0.5):  # 50% APY max by default
         self.max_apy_threshold = max_apy_threshold
+        self.min_apy_threshold = 0.001  # 0.1% minimum APY
+        self.min_tvl_threshold = 10000  # $10,000 minimum TVL
     
     def remove_outliers(self, opportunities: List[YieldOpportunity]) -> List[YieldOpportunity]:
-        """Remove statistical outliers from APY values"""
+        """Remove statistical outliers from APY values using multiple criteria"""
         if not opportunities:
             return []
             
-        apys = [opp.apy for opp in opportunities]
+        # First filter by basic thresholds
+        basic_filtered = [
+            opp for opp in opportunities 
+            if (self.min_apy_threshold <= opp.apy <= self.max_apy_threshold and 
+                opp.tvl >= self.min_tvl_threshold)
+        ]
         
-        # Calculate mean and standard deviation
+        if not basic_filtered:
+            return []
+            
+        # Then apply statistical filtering
+        apys = [opp.apy for opp in basic_filtered]
+        
         try:
             avg = mean(apys)
             std = stdev(apys)
             
-            # Define outlier thresholds (2 standard deviations)
-            upper_bound = min(avg + 2 * std, self.max_apy_threshold)
-            lower_bound = max(0, avg - 2 * std)
+            # Use more conservative bounds (1.5 standard deviations)
+            upper_bound = min(avg + 1.5 * std, self.max_apy_threshold)
+            lower_bound = max(self.min_apy_threshold, avg - 1.5 * std)
             
-            # Filter opportunities
+            # Apply multiple filtering criteria
             filtered = [
-                opp for opp in opportunities 
-                if lower_bound <= opp.apy <= upper_bound
+                opp for opp in basic_filtered
+                if all([
+                    lower_bound <= opp.apy <= upper_bound,  # Within statistical bounds
+                    opp.apy <= self.max_apy_threshold,      # Below absolute maximum
+                    opp.apy >= self.min_apy_threshold,      # Above absolute minimum
+                    opp.tvl >= self.min_tvl_threshold       # Sufficient liquidity
+                ])
             ]
             
             return filtered
-        except Exception:
+        except Exception as e:
             # Fallback to simple threshold if statistical calculation fails
-            return [opp for opp in opportunities if opp.apy <= self.max_apy_threshold]
+            return [
+                opp for opp in opportunities 
+                if (self.min_apy_threshold <= opp.apy <= self.max_apy_threshold and 
+                    opp.tvl >= self.min_tvl_threshold)
+            ]
     
     def to_dict_list(self, opportunities: List[YieldOpportunity]) -> List[Dict]:
         """Convert opportunities to list of dictionaries"""

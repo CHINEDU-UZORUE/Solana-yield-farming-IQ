@@ -98,11 +98,11 @@ async def root():
 
 @app.get("/api/yields")
 async def get_yields(
-    min_apy: float = Query(0.0, ge=0.0, description="Minimum APY (as decimal, e.g., 0.05 for 5%)"),
-    min_tvl: int = Query(0, ge=0, description="Minimum TVL in USD"),
+    min_apy: float = Query(0.001, ge=0.001, description="Minimum APY (as decimal)"),
+    min_tvl: int = Query(10000, ge=0, description="Minimum TVL in USD"),
     categories: Optional[str] = Query(None, description="Comma-separated categories"),
     limit: int = Query(100, ge=1, le=500, description="Maximum number of results"),
-    max_apy: float = Query(2.0, ge=0.0, le=10.0, description="Maximum APY (as decimal)")
+    max_apy: float = Query(0.5, ge=0.0, le=2.0, description="Maximum APY (as decimal)")
 ):
     """Get Solana yield opportunities with filters"""
     try:
