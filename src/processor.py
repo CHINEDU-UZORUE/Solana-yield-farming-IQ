@@ -130,3 +130,14 @@ class YieldDataProcessor:
             return 'Medium'
         else:
             return 'High'
+
+    def process_data(self, opportunities: List[YieldOpportunity]) -> List[Dict]:
+        """Single entry point for data processing to ensure consistency"""
+        if not opportunities:
+            return []
+            
+        # Remove outliers
+        filtered_opps = self.remove_outliers(opportunities)
+        
+        # Convert to dictionary format
+        return self.to_dict_list(filtered_opps)

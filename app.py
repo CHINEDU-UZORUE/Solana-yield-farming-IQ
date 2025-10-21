@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict
 from datetime import datetime, timedelta
 import logging
+from collections import Counter, defaultdict
 
 # Import existing modules
 from src.collector import get_all_solana_yields, YieldOpportunity
@@ -113,23 +114,25 @@ async def get_yields(
         processor = YieldDataProcessor(max_apy_threshold=max_apy)
         processed_data = processor.to_dict_list(opportunities)
         
-        # Filter by categories if specified
+        # Count protocols before filtering
+        all_protocols = set(opp['protocol'] for opp in processed_data)
+        logger.info(f"Total protocols before filtering: {len(all_protocols)}")
+        
+        # Apply filters
         if categories:
             category_list = [c.strip() for c in categories.split(',')]
-            processed_data = [
-                opp for opp in processed_data 
-                if opp['category'] in category_list
-            ]
-            
-        # Apply other filters
+            processed_data = [opp for opp in processed_data if opp['category'] in category_list]
+        
         filtered_data = [
             opp for opp in processed_data
             if opp['apy'] >= min_apy and opp['tvl'] >= min_tvl
         ]
         
-        # Sort by APY descending and apply limit
-        sorted_data = sorted(filtered_data, key=lambda x: x['apy'], reverse=True)[:limit]
+        # Count protocols after filtering
+        filtered_protocols = set(opp['protocol'] for opp in filtered_data)
+        logger.info(f"Total protocols after filtering: {len(filtered_protocols)}")
         
+        sorted_data = sorted(filtered_data, key=lambda x: x['apy'], reverse=True)[:limit]
         return sorted_data
         
     except Exception as e:
@@ -140,24 +143,40 @@ async def get_analytics():
     """Get market analytics summary"""
     try:
         opportunities = await get_cached_yields()
-        
         if not opportunities:
-            raise HTTPException(status_code=404, detail="No yield data available")
-        
+            return {"error": "No data available"}
+            
         processor = YieldDataProcessor()
-        stats = processor.get_summary_stats(opportunities)
+        # Use the same filtering logic as /api/yields
+        processed_data = processor.to_dict_list(opportunities)
         
-        return AnalyticsResponse(
-            total_opportunities=stats['total_opportunities'],
-            total_protocols=stats['total_protocols'],
-            total_tvl=stats['total_tvl'],
-            average_apy=stats['average_apy'],
-            categories=stats['categories'],
-            top_protocols=stats['top_protocols']
-        )
+        # Calculate analytics using processed data
+        total_opportunities = len(processed_data)
+        protocols = set(opp['protocol'] for opp in processed_data)
+        total_protocols = len(protocols)
+        
+        total_tvl = sum(opp['tvl'] for opp in processed_data)
+        average_apy = sum(opp['apy'] for opp in processed_data) / total_opportunities if total_opportunities > 0 else 0
+        
+        categories = Counter(opp['category'] for opp in processed_data)
+        
+        # Calculate TVL by protocol
+        protocol_tvl = defaultdict(float)
+        for opp in processed_data:
+            protocol_tvl[opp['protocol']] += opp['tvl']
+        
+        top_protocols = dict(sorted(protocol_tvl.items(), key=lambda x: x[1], reverse=True)[:5])
+        
+        return {
+            "total_opportunities": total_opportunities,
+            "total_protocols": total_protocols,
+            "total_tvl": total_tvl,
+            "average_apy": average_apy,
+            "categories": dict(categories),
+            "top_protocols": top_protocols
+        }
         
     except Exception as e:
-        logger.error(f"Error in get_analytics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/optimize")
