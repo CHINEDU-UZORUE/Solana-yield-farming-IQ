@@ -101,7 +101,8 @@ async def get_yields(
     min_apy: float = Query(0.0, ge=0.0, description="Minimum APY (as decimal, e.g., 0.05 for 5%)"),
     min_tvl: int = Query(0, ge=0, description="Minimum TVL in USD"),
     categories: Optional[str] = Query(None, description="Comma-separated categories"),
-    limit: int = Query(100, ge=1, le=500, description="Maximum number of results")
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of results"),
+    max_apy: float = Query(2.0, ge=0.0, le=10.0, description="Maximum APY (as decimal)")
 ):
     """Get Solana yield opportunities with filters"""
     try:
@@ -110,8 +111,14 @@ async def get_yields(
         if not opportunities:
             return []
         
+        # Initialize processor with custom max APY threshold
+        processor = YieldDataProcessor(max_apy_threshold=max_apy)
+        
+        # Remove outliers first
+        filtered_opportunities = processor.remove_outliers(opportunities)
+        
         # Apply filters
-        filtered_opportunities = opportunities.copy()
+        filtered_opportunities = filtered_opportunities.copy()
         
         # Filter by APY
         if min_apy > 0:

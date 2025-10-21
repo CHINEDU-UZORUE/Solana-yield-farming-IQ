@@ -1,15 +1,49 @@
 from typing import List, Dict
 from collections import Counter, defaultdict
+from statistics import mean, stdev
 from .collector import YieldOpportunity
 
 class YieldDataProcessor:
     """Process yield data for analysis without pandas dependency"""
     
+    def __init__(self, max_apy_threshold: float = 2.0):  # 200% APY max by default
+        self.max_apy_threshold = max_apy_threshold
+    
+    def remove_outliers(self, opportunities: List[YieldOpportunity]) -> List[YieldOpportunity]:
+        """Remove statistical outliers from APY values"""
+        if not opportunities:
+            return []
+            
+        apys = [opp.apy for opp in opportunities]
+        
+        # Calculate mean and standard deviation
+        try:
+            avg = mean(apys)
+            std = stdev(apys)
+            
+            # Define outlier thresholds (2 standard deviations)
+            upper_bound = min(avg + 2 * std, self.max_apy_threshold)
+            lower_bound = max(0, avg - 2 * std)
+            
+            # Filter opportunities
+            filtered = [
+                opp for opp in opportunities 
+                if lower_bound <= opp.apy <= upper_bound
+            ]
+            
+            return filtered
+        except Exception:
+            # Fallback to simple threshold if statistical calculation fails
+            return [opp for opp in opportunities if opp.apy <= self.max_apy_threshold]
+    
     def to_dict_list(self, opportunities: List[YieldOpportunity]) -> List[Dict]:
         """Convert opportunities to list of dictionaries"""
         
+        # First remove outliers
+        filtered_opportunities = self.remove_outliers(opportunities)
+        
         data = []
-        for opp in opportunities:
+        for opp in filtered_opportunities:
             data.append({
                 'protocol': opp.protocol,
                 'pair': opp.pair,
@@ -30,10 +64,15 @@ class YieldDataProcessor:
         if not opportunities:
             return {'error': 'No opportunities'}
         
-        data = self.to_dict_list(opportunities)
+        # Remove outliers before processing
+        filtered_opportunities = self.remove_outliers(opportunities)
+        data = self.to_dict_list(filtered_opportunities)
+        
+        if not data:
+            return {'error': 'No valid opportunities after filtering'}
         
         # Basic calculations
-        total_opportunities = len(opportunities)
+        total_opportunities = len(filtered_opportunities)
         protocols = set(opp['protocol'] for opp in data)
         total_protocols = len(protocols)
         
@@ -59,5 +98,6 @@ class YieldDataProcessor:
             'total_tvl': total_tvl,
             'average_apy': average_apy,
             'categories': dict(categories),
-            'top_protocols': top_protocols
+            'top_protocols': top_protocols,
+            'filtered_count': len(opportunities) - total_opportunities  # Number of filtered outliers
         }
